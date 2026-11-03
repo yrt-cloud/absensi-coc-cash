@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Absensi Mingguan (Senin - Jumat)</title>
+    <!-- Tailwind CSS untuk Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style kustom untuk scrollbar tabel */
+        .table-responsive::-webkit-scrollbar {
+            height: 8px;
+        }
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        /* Style cetak */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            body > *:not(#print-area) {
+                display: none !important;
+            }
+            #print-area, #print-area * {
+                display: block !important;
+                visibility: visible !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 pb-12">
+
+    <!-- Header & Container Utama -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        
+        <!-- Navbar / Judul Aplikasi -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 mb-6 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-4 w-full md:w-auto">
+                <div class="bg-indigo-600 text-white p-3.5 rounded-2xl shadow-md shadow-indigo-200 flex items-center justify-center">
+                    <i data-lucide="calendar-check-2" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Daftar Absensi Mingguan</h1>
+                    <p class="text-sm text-slate-500">Rekapitulasi kehadiran 5 hari kerja (Senin - Jumat)</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2.5 no-print w-full md:w-auto flex-wrap sm:flex-nowrap justify-end">
+                <button onclick="switchTab('weekly')" id="tab-btn-weekly" class="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white font-medium px-4 py-2.5 rounded-xl transition text-sm shadow-sm">
+                    <i data-lucide="calendar" class="w-4 h-4"></i> Absensi Mingguan
+                </button>
+                <button onclick="switchTab('history')" id="tab-btn-history" class="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-xl transition text-sm">
+                    <i data-lucide="history" class="w-4 h-4"></i> Riwayat & Rekap Bulanan
+                </button>
+                <button onclick="exportData()" class="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-xl transition text-sm">
+                    <i data-lucide="download" class="w-4 h-4"></i> Ekspor
+                </button>
+                <label class="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-xl transition text-sm cursor-pointer">
+                    <i data-lucide="upload" class="w-4 h-4"></i> Restore
+                    <input type="file" id="import-file" accept=".json" onchange="importData(event)" class="hidden">
+                </label>
+                <button onclick="printSimpleReport()" class="no-print-tab inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2.5 rounded-xl transition text-sm shadow-sm">
+                    <i data-lucide="printer" class="w-4 h-4"></i> Cetak Ringkas
+                </button>
+            </div>
+        </div>
+
+        <!-- Kontainer Tab 1: Absensi Mingguan -->
+        <div id="tab-content-weekly">
+        <!-- Toolbar Kontrol (Tambah Anggota & Informasi Minggu) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 no-print">
+            
+            <!-- Form Tambah Anggota -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 lg:col-span-2 relative">
+            <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <i data-lucide="user-plus" class="w-4 h-4 text-indigo-600"></i> Tambah Anggota / Karyawan
+            </h2>
+            <form id="add-form" onsubmit="handleAddMember(event)" class="flex flex-col sm:flex-row gap-3 relative">
+                <div class="flex-1 relative">
+                    <input type="text" id="new-name" placeholder="Masukkan atau cari nama anggota..." required autocomplete="off"
+                           oninput="handleNameInput(this.value)"
+                           onkeydown="handleNameKeydown(event)"
+                           class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-sm">
+                    <!-- Dropdown Autocomplete Sugesti Anggota Sebelumnya -->
+                    <div id="autocomplete-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-30 max-h-48 overflow-y-auto"></div>
+                </div>
+                <input type="text" id="new-role" placeholder="Jabatan/Divisi (Opsional)" 
+                       onkeydown="handleNameKeydown(event)"
+                       class="sm:w-1/3 px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-sm">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-sm">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Tambah
+                </button>
+            </form>
+        </div>
+
+        <!-- Informasi & Reset -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <i data-lucide="info" class="w-4 h-4 text-indigo-600"></i> Panduan Singkat
+                    </h2>
+                    <p class="text-xs text-slate-500 leading-relaxed">
+                        Klik tombol tanggal di bawah atau ikon huruf status pada tabel untuk mengubah status kehadiran dengan cepat.
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+                    <span id="total-count" class="text-xs font-medium text-slate-500">Total: 0 Anggota</span>
+                    <button onclick="resetAllStatus()" class="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline">
+                        Reset Absen Minggu Ini
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Pemilih Tanggal Mingguan -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="calendar" class="w-5 h-5 text-indigo-600"></i>
+                    <h2 class="text-base font-bold text-slate-800">Menu Tanggal Minggu Ini</h2>
+                    <span class="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1 rounded-lg border border-indigo-100">Klik tanggal untuk detail harian</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-500 no-print">
+                    <label for="week-start-date" class="font-medium whitespace-nowrap">Mulai Senin Tanggal:</label>
+                    <input type="date" id="week-start-date" onchange="updateDates(this.value)" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3" id="date-buttons-container">
+                <!-- Tombol tanggal di-render dinamis dari JS -->
+            </div>
+        </div>
+
+        <!-- Tabel Absensi Utama -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden mb-6">
+            <div class="table-responsive overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[900px]">
+                    <thead>
+                        <tr class="bg-slate-100/80 text-slate-700 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                            <th class="py-4 px-4 w-12 text-center">No</th>
+                            <th class="py-4 px-6 min-w-[200px]">Nama Lengkap</th>
+                            <th class="py-4 px-3 text-center w-20">Senin</th>
+                            <th class="py-4 px-3 text-center w-20">Selasa</th>
+                            <th class="py-4 px-3 text-center w-20">Rabu</th>
+                            <th class="py-4 px-3 text-center w-20">Kamis</th>
+                            <th class="py-4 px-3 text-center w-20">Jumat</th>
+                            <th class="py-4 px-6 min-w-[220px]">Keterangan Tidak Hadir</th>
+                            <th class="py-4 px-4 text-center w-24 no-print">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendance-tbody" class="divide-y divide-slate-200 text-sm">
+                        <!-- Data akan di-render di sini oleh JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- State Kosong jika tidak ada data -->
+            <div id="empty-state" class="hidden py-12 text-center">
+                <i data-lucide="users" class="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
+                <h3 class="text-slate-600 font-medium text-base mb-1">Belum Ada Anggota</h3>
+                <p class="text-slate-400 text-xs">Silakan tambahkan nama anggota/karyawan baru di atas.</p>
+            </div>
+        </div>
+
+        <!-- Ringkasan Absensi (Statistik) -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div class="bg-emerald-50 border border-emerald-200/60 p-3.5 rounded-2xl flex items-center gap-3">
+                <div class="bg-emerald-500 text-white p-2.5 rounded-xl font-bold text-sm">H</div>
+                <div>
+                    <div class="text-[11px] font-semibold text-emerald-800 uppercase">Hadir</div>
+                    <div id="stat-h" class="text-lg font-bold text-emerald-900">0</div>
+                </div>
+            </div>
+            <div class="bg-amber-50 border border-amber-200/60 p-3.5 rounded-2xl flex items-center gap-3">
+                <div class="bg-amber-500 text-white p-2.5 rounded-xl font-bold text-sm">I</div>
+                <div>
+                    <div class="text-[11px] font-semibold text-amber-800 uppercase">Izin</div>
+                    <div id="stat-i" class="text-lg font-bold text-amber-900">0</div>
+                </div>
+            </div>
+            <div class="bg-blue-50 border border-blue-200/60 p-3.5 rounded-2xl flex items-center gap-3">
+                <div class="bg-blue-500 text-white p-2.5 rounded-xl font-bold text-sm">S</div>
+                <div>
+                    <div class="text-[11px] font-semibold text-blue-800 uppercase">Sakit</div>
+                    <div id="stat-s" class="text-lg font-bold text-blue-900">0</div>
+                </div>
+            </div>
+            <div class="bg-rose-50 border border-rose-200/60 p-3.5 rounded-2xl flex items-center gap-3">
+                <div class="bg-rose-500 text-white p-2.5 rounded-xl font-bold text-sm">A</div>
+                <div>
+                    <div class="text-[11px] font-semibold text-rose-800 uppercase">Alpa</div>
+                    <div id="stat-a" class="text-lg font-bold text-rose-900">0</div>
+                </div>
+            </div>
+            <div class="bg-purple-50 border border-purple-200/60 p-3.5 rounded-2xl flex items-center gap-3 col-span-2 sm:col-span-1">
+                <div class="bg-purple-500 text-white p-2.5 rounded-xl font-bold text-sm">L</div>
+                <div>
+                    <div class="text-[11px] font-semibold text-purple-800 uppercase">Libur / Cuti</div>
+                    <div id="stat-l" class="text-lg font-bold text-purple-900">0</div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Kontainer Tab 2: Riwayat Personal & Rekap Bulanan -->
+        <div id="tab-content-history" class="hidden space-y-6">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/85">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Rekapitulasi Riwayat Personal Kehadiran</h2>
+                        <p class="text-xs text-slate-500">Akumulasi total kehadiran seluruh anggota berdasarkan filter bulan</p>
+                    </div>
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <label for="month-filter-select" class="text-xs font-semibold text-slate-600 whitespace-nowrap">Pilih Bulan:</label>
+                        <select id="month-filter-select" onchange="renderHistoryTable()" class="px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                            <option value="ALL">Semua Bulan (Keseluruhan)</option>
+                        </select>
+                        <button onclick="renderHistoryTable()" class="px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[700px]">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                                <th class="py-3.5 px-4 w-12 text-center">No</th>
+                                <th class="py-3.5 px-4 min-w-[200px]">Nama Anggota</th>
+                                <th class="py-3.5 px-3 text-center w-24 text-emerald-700 bg-emerald-50/50">Hadir (H)</th>
+                                <th class="py-3.5 px-3 text-center w-24 text-amber-700 bg-amber-50/50">Izin (I)</th>
+                                <th class="py-3.5 px-3 text-center w-24 text-blue-700 bg-blue-50/50">Sakit (S)</th>
+                                <th class="py-3.5 px-3 text-center w-24 text-rose-700 bg-rose-50/50">Alpa (A)</th>
+                                <th class="py-3.5 px-3 text-center w-24 text-purple-700 bg-purple-50/50">Libur (L)</th>
+                                <th class="py-3.5 px-4 text-center w-28">Total Hari Tercatat</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody" class="divide-y divide-slate-100 text-sm">
+                            <!-- Diisi via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Dropdown Selector Popup untuk Pilihan Status Langsung -->
+    <div id="status-picker-popover" class="fixed hidden bg-white shadow-xl rounded-xl border border-slate-200 p-1.5 z-50 flex gap-1 transform -translate-x-1/2 -translate-y-full mb-2">
+        <button onclick="selectStatusDirect('H')" class="w-8 h-8 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-sm transition">H</button>
+        <button onclick="selectStatusDirect('I')" class="w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm transition">I</button>
+        <button onclick="selectStatusDirect('S')" class="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs shadow-sm transition">S</button>
+        <button onclick="selectStatusDirect('A')" class="w-8 h-8 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-sm transition">A</button>
+        <button onclick="selectStatusDirect('L')" class="w-8 h-8 rounded-lg bg-purple-500 hover:bg-purple-600 text-white font-bold text-xs shadow-sm transition" title="Libur Nasional / Cuti Bersama">L</button>
+        <button onclick="selectStatusDirect('-')" class="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold text-xs shadow-sm transition">-</button>
+    </div>
+
+    <!-- Modal Detail Tanggal -->
+    <div id="date-detail-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                    <div class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-0.5">Laporan Kehadiran Harian</div>
+                    <h3 id="modal-date-title" class="text-lg font-bold text-slate-800">Senin, 01 Jan 2024</h3>
+                </div>
+                <button onclick="closeDateDetailModal()" class="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto space-y-6">
+                <div class="grid grid-cols-4 gap-2 text-center text-xs font-semibold">
+                    <div class="bg-emerald-50 text-emerald-700 py-2 rounded-lg border border-emerald-100">Hadir: <span id="modal-count-h">0</span></div>
+                    <div class="bg-amber-50 text-amber-700 py-2 rounded-lg border border-emerald-100">Izin: <span id="modal-count-i">0</span></div>
+                    <div class="bg-blue-50 text-blue-700 py-2 rounded-lg border border-emerald-100">Sakit: <span id="modal-count-s">0</span></div>
+                    <div class="bg-rose-50 text-rose-700 py-2 rounded-lg border border-emerald-100">Alpa: <span id="modal-count-a">0</span></div>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <i data-lucide="user-x" class="w-4 h-4 text-rose-500"></i> Anggota Tidak Hadir
+                    </h4>
+                    <div id="modal-absent-list" class="space-y-2"></div>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <i data-lucide="user-check" class="w-4 h-4 text-emerald-500"></i> Anggota Hadir
+                    </h4>
+                    <div id="modal-present-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+                <button onclick="closeDateDetailModal()" class="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition shadow-sm">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Edit Nama -->
+    <div id="edit-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-800">Edit Data Anggota</h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="handleSaveEdit(event)" class="space-y-4">
+                <input type="hidden" id="edit-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Lengkap</label>
+                    <input type="text" id="edit-name" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Jabatan / Divisi</label>
+                    <input type="text" id="edit-role" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200 transition">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg text-sm flex items-center gap-3 transition-all transform translate-y-20 opacity-0 z-50">
+        <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+        <span id="toast-message">Pesan notifikasi</span>
+    </div>
+
+    <!-- Tampilan Area Cetak Ringkas -->
+    <div id="print-area" class="hidden print:block bg-white text-slate-900">
+        <div class="border-b-2 border-slate-900 pb-4 mb-6 flex justify-between items-end">
+            <div>
+                <h1 class="text-2xl font-bold uppercase tracking-wide text-slate-900">Laporan Rekapitulasi Kehadiran Mingguan</h1>
+                <p class="text-sm text-slate-600 mt-1">Periode: <span id="print-period-text" class="font-bold text-slate-800"></span></p>
+            </div>
+            <div class="text-right text-xs text-slate-500">
+                Tanggal Cetak: <span id="print-date-stamp"></span>
+            </div>
+        </div>
+        <div id="print-days-container" class="space-y-6"></div>
+        <div class="mt-8 pt-4 border-t border-slate-300 flex justify-between text-xs text-slate-500">
+            <div>Daftar Absensi Mingguan (Senin - Jumat)</div>
+            <div>Laporan Rekapitulasi Otomatis</div>
+        </div>
+    </div>
+
+    <!-- Logic JavaScript -->
+    <script>
+        const STORAGE_KEY_DB = 'absensi_mingguan_db_v4';
+        const days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat'];
+        const dayLabels = { senin: 'Senin', selasa: 'Selasa', rabu: 'Rabu', kamis: 'Kamis', jumat: 'Jumat' };
+        const statusCycle = ['H', 'I', 'S', 'A', 'L', '-'];
+        
+        let allWeeklyData = {}; 
+        let currentMondayDate = getMonday(new Date());
+
+        let defaultInitialMembers = [
+            { id: '1', name: 'Budi Santoso', role: 'Staff IT' },
+            { id: '2', name: 'Siti Aminah', role: 'Desainer' },
+            { id: '3', name: 'Ahmad Rizky', role: 'Marketing' }
+        ];
+
+        function getMonday(d) {
+            d = new Date(d);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(d.setDate(diff));
+        }
+
+        function getMondayKey(dateObj) {
+            return new Date(dateObj).toISOString().split('T')[0];
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedData = localStorage.getItem(STORAGE_KEY_DB);
+            if (savedData) {
+                try { allWeeklyData = JSON.parse(savedData); } catch (e) {}
+            }
+
+            const dateInput = document.getElementById('week-start-date');
+            dateInput.value = getMondayKey(currentMondayDate);
+
+            ensureCurrentWeekInitialized();
+
+            document.addEventListener('click', (e) => {
+                const picker = document.getElementById('status-picker-popover');
+                if (picker && !picker.contains(e.target) && !e.target.closest('.status-btn')) {
+                    picker.classList.add('hidden');
+                }
+            });
+
+            renderDateButtons();
+            renderTable();
+            lucide.createIcons();
+        });
+
+        function switchTab(tabName) {
+            const btnWeekly = document.getElementById('tab-btn-weekly');
+            const btnHistory = document.getElementById('tab-btn-history');
+            const contentWeekly = document.getElementById('tab-content-weekly');
+            const contentHistory = document.getElementById('tab-content-history');
+            const printBtn = document.querySelector('.no-print-tab');
+
+            if (tabName === 'weekly') {
+                btnWeekly.className = "inline-flex items-center justify-center gap-2 bg-indigo-600 text-white font-medium px-4 py-2.5 rounded-xl transition text-sm shadow-sm";
+                btnHistory.className = "inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-xl transition text-sm";
+                contentWeekly.classList.remove('hidden');
+                contentHistory.classList.add('hidden');
+                if (printBtn) printBtn.style.display = 'inline-flex';
+            } else {
+                btnHistory.className = "inline-flex items-center justify-center gap-2 bg-indigo-600 text-white font-medium px-4 py-2.5 rounded-xl transition text-sm shadow-sm";
+                btnWeekly.className = "inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-xl transition text-sm";
+                contentHistory.classList.remove('hidden');
+                contentWeekly.classList.add('hidden');
+                if (printBtn) printBtn.style.display = 'none';
+                populateMonthFilterDropdown();
+                renderHistoryTable();
+            }
+        }
+
+        function populateMonthFilterDropdown() {
+            const select = document.getElementById('month-filter-select');
+            const currentValue = select.value;
+            
+            // Kumpulkan daftar bulan unik dari seluruh kunci minggu (format: YYYY-MM)
+            const monthsMap = new Set();
+            Object.keys(allWeeklyData).forEach(mondayKey => {
+                if (mondayKey) {
+                    // Ambil string YYYY-MM dari tanggal senin
+                    const yearMonth = mondayKey.slice(0, 7);
+                    monthsMap.add(yearMonth);
+                }
+            });
+
+            const sortedMonths = Array.from(monthsMap).sort().reverse();
+
+            select.innerHTML = '<option value="ALL">Semua Bulan (Keseluruhan)</option>';
+            sortedMonths.forEach(ym => {
+                const [year, month] = ym.split('-');
+                const dateObj = new Date(year, month - 1, 1);
+                const monthName = dateObj.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                
+                const opt = document.createElement('option');
+                opt.value = ym;
+                opt.textContent = monthName;
+                select.appendChild(opt);
+            });
+
+            // Kembalikan pilihan jika masih ada
+            if (Array.from(select.options).some(o => o.value === currentValue)) {
+                select.value = currentValue;
+            }
+        }
+
+        function renderHistoryTable() {
+            const tbody = document.getElementById('history-tbody');
+            const selectedMonth = document.getElementById('month-filter-select').value;
+            tbody.innerHTML = '';
+
+            const aggregated = {};
+
+            Object.entries(allWeeklyData).forEach(([mondayKey, week]) => {
+                if (!week || !week.members) return;
+
+                // Jika filter bulan aktif dan tidak cocok dengan minggu ini, lewati
+                if (selectedMonth !== 'ALL') {
+                    // Cek apakah ada hari dalam minggu ini yang masuk ke bulan tersebut atau seninnya di bulan tersebut
+                    const weekYearMonth = mondayKey.slice(0, 7);
+                    
+                    // Atau periksa tanggal hari-hari dalam minggu tersebut
+                    let matchMonth = (weekYearMonth === selectedMonth);
+                    if (!matchMonth) {
+                        const weekDates = getWeekDates(mondayKey);
+                        matchMonth = weekDates.some(wd => {
+                            const ym = wd.fullDate.toISOString().slice(0, 7);
+                            return ym === selectedMonth;
+                        });
+                    }
+                    if (!matchMonth) return;
+                }
+
+                const members = week.members;
+                const attendance = week.attendance || {};
+
+                members.forEach(m => {
+                    const nameKey = m.name.trim().toLowerCase();
+                    if (!aggregated[nameKey]) {
+                        aggregated[nameKey] = {
+                            name: m.name.trim(),
+                            role: m.role || '-',
+                            H: 0, I: 0, S: 0, A: 0, L: 0, total: 0
+                        };
+                    }
+                    const mw = attendance[m.id] || { days: {} };
+                    days.forEach(d => {
+                        const st = mw.days[d] || 'H';
+                        if (st === 'H') aggregated[nameKey].H++;
+                        else if (st === 'I') aggregated[nameKey].I++;
+                        else if (st === 'S') aggregated[nameKey].S++;
+                        else if (st === 'A') aggregated[nameKey].A++;
+                        else if (st === 'L') aggregated[nameKey].L++;
+                        
+                        if (st !== '-') {
+                            aggregated[nameKey].total++;
+                        }
+                    });
+                });
+            });
+
+            const records = Object.values(aggregated);
+            if (records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400 italic text-xs">Belum ada riwayat data kehadiran pada bulan yang dipilih.</td></tr>`;
+                return;
+            }
+
+            records.sort((a, b) => a.name.localeCompare(b.name));
+
+            records.forEach((rec, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-center font-medium text-slate-400 text-xs">${idx + 1}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-800">
+                        <div>${escapeHtml(rec.name)}</div>
+                        <div class="text-[11px] text-slate-400 font-normal">${escapeHtml(rec.role)}</div>
+                    </td>
+                    <td class="py-3 px-3 text-center font-bold text-emerald-700 bg-emerald-50/30">${rec.H}</td>
+                    <td class="py-3 px-3 text-center font-bold text-amber-700 bg-amber-50/30">${rec.I}</td>
+                    <td class="py-3 px-3 text-center font-bold text-blue-700 bg-blue-50/30">${rec.S}</td>
+                    <td class="py-3 px-3 text-center font-bold text-rose-700 bg-rose-50/30">${rec.A}</td>
+                    <td class="py-3 px-3 text-center font-bold text-purple-700 bg-purple-50/30">${rec.L}</td>
+                    <td class="py-3 px-4 text-center font-bold text-slate-700">${rec.total} Hari</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function getCurrentWeekData() {
+            const key = getMondayKey(currentMondayDate);
+            if (!allWeeklyData[key]) {
+                // Jika belum ada data di minggu ini, ambil anggota dari minggu sebelumnya jika ada, atau gunakan default
+                let inheritedMembers = JSON.parse(JSON.stringify(defaultInitialMembers));
+                
+                // Cari minggu terdekat sebelumnya untuk mewariskan nama anggota jika diinginkan, atau set default
+                const keys = Object.keys(allWeeklyData).sort();
+                if (keys.length > 0) {
+                    const lastKey = keys[keys.length - 1];
+                    if (allWeeklyData[lastKey] && allWeeklyData[lastKey].members) {
+                        inheritedMembers = JSON.parse(JSON.stringify(allWeeklyData[lastKey].members));
+                    }
+                }
+
+                allWeeklyData[key] = {
+                    members: inheritedMembers,
+                    attendance: {}
+                };
+            }
+            if (!allWeeklyData[key].members) {
+                allWeeklyData[key].members = JSON.parse(JSON.stringify(defaultInitialMembers));
+            }
+            if (!allWeeklyData[key].attendance) {
+                allWeeklyData[key].attendance = {};
+            }
+            return allWeeklyData[key];
+        }
+
+        function ensureCurrentWeekInitialized() {
+            getCurrentWeekData();
+        }
+
+        // Ambil daftar unik seluruh anggota dari semua minggu untuk fitur pencarian/autocomplete
+        function getAllUniqueMembersHistory() {
+            const uniqueMap = new Map();
+            Object.values(allWeeklyData).forEach(week => {
+                if (week && week.members) {
+                    week.members.forEach(m => {
+                        const cleanName = m.name.trim();
+                        if (cleanName && !uniqueMap.has(cleanName.toLowerCase())) {
+                            uniqueMap.set(cleanName.toLowerCase(), { name: m.name, role: m.role || '' });
+                        }
+                    });
+                }
+            });
+            return Array.from(uniqueMap.values());
+        }
+
+        function handleNameInput(query) {
+            const dropdown = document.getElementById('autocomplete-dropdown');
+            const q = query.trim().toLowerCase();
+            
+            if (!q) {
+                dropdown.classList.add('hidden');
+                dropdown.innerHTML = '';
+                return;
+            }
+
+            const historyMembers = getAllUniqueMembersHistory();
+            const currentWeekMembers = getCurrentWeekData().members.map(m => m.name.toLowerCase());
+            
+            // Filter anggota yang cocok dengan ketikan dan belum ada di minggu aktif ini
+            const matches = historyMembers.filter(m => 
+                m.name.toLowerCase().includes(q) && !currentWeekMembers.includes(m.name.toLowerCase())
+            );
+
+            if (matches.length === 0) {
+                dropdown.classList.add('hidden');
+                dropdown.innerHTML = '';
+                return;
+            }
+
+            dropdown.innerHTML = '';
+            matches.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "px-4 py-2.5 hover:bg-indigo-50 cursor-pointer flex justify-between items-center text-xs border-b border-slate-100 last:border-none";
+                div.innerHTML = `
+                    <span class="font-semibold text-slate-800">${escapeHtml(item.name)}</span>
+                    <span class="text-slate-400 text-[11px]">${escapeHtml(item.role || 'Dari riwayat minggu lain')}</span>
+                `;
+                div.onclick = () => {
+                    document.getElementById('new-name').value = item.name;
+                    document.getElementById('new-role').value = item.role;
+                    dropdown.classList.add('hidden');
+                    dropdown.innerHTML = '';
+                    
+                    // Otomatis langsung submit/tambah anggota begitu item diklik dari dropdown
+                    const form = document.getElementById('add-form');
+                    if (form) {
+                        form.requestSubmit();
+                    }
+                };
+                dropdown.appendChild(div);
+            });
+
+            dropdown.classList.remove('hidden');
+        }
+
+        // Fungsi tangkap tombol Enter saat mengetik nama anggota
+        function handleNameKeydown(event) {
+            if (event.key === 'Enter') {
+                const dropdown = document.getElementById('autocomplete-dropdown');
+                if (dropdown && !dropdown.classList.contains('hidden') && dropdown.firstElementChild) {
+                    // Jika dropdown aktif, klik item pertama secara otomatis saat enter ditekan
+                    event.preventDefault();
+                    dropdown.firstElementChild.click();
+                }
+            }
+        }
+
+        // Tutup dropdown saat klik di luar
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('autocomplete-dropdown');
+            const nameInput = document.getElementById('new-name');
+            if (dropdown && !dropdown.contains(e.target) && e.target !== nameInput) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY_DB, JSON.stringify(allWeeklyData));
+            updateStats();
+        }
+
+        function updateDates(dateString) {
+            if (!dateString) return;
+            const selectedDate = new Date(dateString);
+            currentMondayDate = getMonday(selectedDate);
+            
+            ensureCurrentWeekInitialized();
+
+            renderDateButtons();
+            renderTable();
+            showToast('Memuat data periode: ' + getMondayKey(currentMondayDate));
+        }
+
+        function renderDateButtons() {
+            const container = document.getElementById('date-buttons-container');
+            container.innerHTML = '';
+
+            const weekData = getCurrentWeekData();
+            const members = weekData.members;
+            const attendance = weekData.attendance;
+
+            days.forEach((dayKey, idx) => {
+                const dateObj = new Date(currentMondayDate);
+                dateObj.setDate(currentMondayDate.getDate() + idx);
+                
+                const formattedDate = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+                const fullFormattedDate = dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+                let hadir = 0, tidakHadir = 0, libur = 0;
+                members.forEach(m => {
+                    const memberWeek = attendance[m.id] || { days: {}, notes: '' };
+                    const st = memberWeek.days[dayKey] || 'H';
+                    if (st === 'H') hadir++;
+                    else if (['I', 'S', 'A'].includes(st)) tidakHadir++;
+                    else if (st === 'L') libur++;
+                });
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => showDateDetailModal(dayKey, fullFormattedDate);
+                btn.className = `p-3 rounded-xl border text-left transition transform hover:-translate-y-0.5 active:translate-y-0 flex flex-col justify-between ${
+                    libur > 0 ? 'bg-purple-50/60 border-purple-200 hover:border-purple-300' :
+                    (tidakHadir > 0 
+                        ? 'bg-gradient-to-br from-white to-amber-50/50 border-amber-200 hover:border-amber-400' 
+                        : 'bg-white border-slate-200 hover:border-indigo-400')
+                }`;
+
+                let statusBadgeText = '<span class="text-slate-400">Semua Hadir</span>';
+                if (libur > 0) {
+                    statusBadgeText = `<span class="text-purple-600 font-semibold flex items-center gap-1"><i data-lucide="umbrella" class="w-3.5 h-3.5"></i> Libur/Cuti (${libur})</span>`;
+                } else if (tidakHadir > 0) {
+                    statusBadgeText = `<span class="text-rose-600 font-semibold flex items-center gap-1"><i data-lucide="x" class="w-3.5 h-3.5"></i> ${tidakHadir} Tidak Hadir</span>`;
+                }
+
+                btn.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold uppercase text-slate-500">${dayLabels[dayKey]}</span>
+                        <span class="text-xs font-semibold px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">${formattedDate}</span>
+                    </div>
+                    <div class="flex items-center gap-2 mt-1 text-xs">
+                        <span class="text-emerald-600 font-semibold flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> ${hadir}</span>
+                        ${statusBadgeText}
+                    </div>
+                `;
+
+                container.appendChild(btn);
+            });
+
+            lucide.createIcons();
+        }
+
+        function showDateDetailModal(dayKey, dateTitle) {
+            document.getElementById('modal-date-title').textContent = dateTitle;
+            
+            const absentContainer = document.getElementById('modal-absent-list');
+            const presentContainer = document.getElementById('modal-present-list');
+            
+            absentContainer.innerHTML = '';
+            presentContainer.innerHTML = '';
+
+            const weekData = getCurrentWeekData();
+            const members = weekData.members;
+            const attendance = weekData.attendance;
+
+            let cH = 0, cI = 0, cS = 0, cA = 0;
+
+            members.forEach(m => {
+                const memberWeek = attendance[m.id] || { days: {}, notes: '' };
+                const status = memberWeek.days[dayKey] || 'H';
+
+                if (status === 'H') cH++;
+                else if (status === 'I') cI++;
+                else if (status === 'S') cS++;
+                else if (status === 'A') cA++;
+
+                if (status === 'H') {
+                    const div = document.createElement('div');
+                    div.className = "flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs";
+                    div.innerHTML = `
+                        <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                        <div>
+                            <div class="font-semibold text-slate-800">${escapeHtml(m.name)}</div>
+                            <div class="text-[10px] text-slate-400">${escapeHtml(m.role || '-')}</div>
+                        </div>
+                    `;
+                    presentContainer.appendChild(div);
+                } else if (['I', 'S', 'A', 'L'].includes(status)) {
+                    let badgeBg = status === 'I' ? 'bg-amber-500' : (status === 'S' ? 'bg-blue-500' : (status === 'A' ? 'bg-rose-500' : 'bg-purple-500'));
+                    let statusText = status === 'I' ? 'Izin' : (status === 'S' ? 'Sakit' : (status === 'A' ? 'Alpa' : 'Libur / Cuti'));
+                    
+                    const div = document.createElement('div');
+                    div.className = "p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col gap-1 text-xs";
+                    div.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-800">${escapeHtml(m.name)} <span class="text-slate-400 font-normal">(${escapeHtml(m.role || '-')})</span></span>
+                            <span class="${badgeBg} text-white font-bold px-2 py-0.5 rounded text-[10px] uppercase">${statusText}</span>
+                        </div>
+                        <div class="text-slate-600 bg-white p-2 rounded-lg border border-slate-100 text-[11px] mt-1">
+                            <span class="font-semibold text-slate-400">Keterangan:</span> ${escapeHtml(memberWeek.notes || 'Tidak ada alasan dicatat.')}
+                        </div>
+                    `;
+                    absentContainer.appendChild(div);
+                }
+            });
+
+            if (absentContainer.children.length === 0) {
+                absentContainer.innerHTML = `<div class="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-xl text-center">Semua anggota hadir pada tanggal ini! 🎉</div>`;
+            }
+
+            if (presentContainer.children.length === 0) {
+                presentContainer.innerHTML = `<div class="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-xl text-center col-span-2">Tidak ada anggota yang hadir.</div>`;
+            }
+
+            document.getElementById('modal-count-h').textContent = cH;
+            document.getElementById('modal-count-i').textContent = cI;
+            document.getElementById('modal-count-s').textContent = cS;
+            document.getElementById('modal-count-a').textContent = cA;
+
+            document.getElementById('date-detail-modal').classList.remove('hidden');
+        }
+
+        function closeDateDetailModal() {
+            document.getElementById('date-detail-modal').classList.add('hidden');
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('attendance-tbody');
+            const emptyState = document.getElementById('empty-state');
+            tbody.innerHTML = '';
+
+            const weekData = getCurrentWeekData();
+            const members = weekData.members;
+            const attendance = weekData.attendance;
+
+            if (members.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            members.forEach((member, index) => {
+                if (!attendance[member.id]) {
+                    attendance[member.id] = { days: {}, notes: '' };
+                }
+                const memberWeek = attendance[member.id];
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition-colors";
+
+                let daysCellsHTML = '';
+                days.forEach(day => {
+                    const status = memberWeek.days[day] || 'H';
+                    const badgeClass = getStatusBadgeClass(status);
+                    daysCellsHTML += `
+                        <td class="py-3 px-3 text-center">
+                            <div class="inline-flex flex-col items-center gap-1">
+                                <button type="button" onclick="cycleStatus('${member.id}', '${day}')" 
+                                        class="w-10 h-10 rounded-xl font-bold text-xs flex items-center justify-center transition-all transform active:scale-95 shadow-sm cursor-pointer ${badgeClass}"
+                                        title="Klik untuk ubah status (H/I/S/A/L/-)">
+                                    ${status}
+                                </button>
+                                <div class="flex gap-0.5 text-[9px] font-semibold">
+                                    <span onclick="setStatusDirect('${member.id}', '${day}', 'H')" class="cursor-pointer px-1 bg-emerald-100 text-emerald-800 rounded hover:bg-emerald-200">H</span>
+                                    <span onclick="setStatusDirect('${member.id}', '${day}', 'I')" class="cursor-pointer px-1 bg-amber-100 text-amber-800 rounded hover:bg-amber-200">I</span>
+                                    <span onclick="setStatusDirect('${member.id}', '${day}', 'S')" class="cursor-pointer px-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200">S</span>
+                                    <span onclick="setStatusDirect('${member.id}', '${day}', 'A')" class="cursor-pointer px-1 bg-rose-100 text-rose-800 rounded hover:bg-rose-200">A</span>
+                                    <span onclick="setStatusDirect('${member.id}', '${day}', 'L')" class="cursor-pointer px-1 bg-purple-100 text-purple-800 rounded hover:bg-purple-200" title="Libur">L</span>
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                });
+
+                tr.innerHTML = `
+                    <td class="py-4 px-4 text-center font-medium text-slate-400">${index + 1}</td>
+                    <td class="py-4 px-6">
+                        <div class="font-semibold text-slate-800">${escapeHtml(member.name)}</div>
+                        <div class="text-xs text-slate-400">${escapeHtml(member.role || '-')}</div>
+                    </td>
+                    ${daysCellsHTML}
+                    <td class="py-3 px-6">
+                        <input type="text" 
+                               value="${escapeHtml(memberWeek.notes || '')}" 
+                               placeholder="Alasan izin/sakit/alpa/libur..."
+                               onchange="updateNotes('${member.id}', this.value)"
+                               class="w-full px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-xs bg-slate-50/50 focus:bg-white transition">
+                    </td>
+                    <td class="py-3 px-4 text-center no-print">
+                        <div class="flex items-center justify-center gap-1">
+                            <button type="button" onclick="openEditModal('${member.id}')" title="Edit Nama" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                            </button>
+                            <button type="button" onclick="deleteMember('${member.id}')" title="Hapus Anggota" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('total-count').textContent = `Total: ${members.length} Anggota`;
+            updateStats();
+            renderDateButtons();
+            lucide.createIcons();
+        }
+
+        function getStatusBadgeClass(status) {
+            switch(status) {
+                case 'H': return 'bg-emerald-500 text-white hover:bg-emerald-600 ring-2 ring-emerald-200';
+                case 'I': return 'bg-amber-500 text-white hover:bg-amber-600 ring-2 ring-amber-200';
+                case 'S': return 'bg-blue-500 text-white hover:bg-blue-600 ring-2 ring-blue-200';
+                case 'A': return 'bg-rose-500 text-white hover:bg-rose-600 ring-2 ring-rose-200';
+                case 'L': return 'bg-purple-500 text-white hover:bg-purple-600 ring-2 ring-purple-200';
+                default: return 'bg-slate-100 text-slate-400 hover:bg-slate-200 border border-slate-200';
+            }
+        }
+
+        function cycleStatus(memberId, day) {
+            const weekData = getCurrentWeekData();
+            if (!weekData.attendance[memberId]) weekData.attendance[memberId] = { days: {}, notes: '' };
+            const current = weekData.attendance[memberId].days[day] || 'H';
+            const currentIndex = statusCycle.indexOf(current);
+            const nextStatus = statusCycle[(currentIndex + 1) % statusCycle.length];
+            weekData.attendance[memberId].days[day] = nextStatus;
+            saveData();
+            renderTable();
+        }
+
+        function setStatusDirect(memberId, day, status) {
+            const weekData = getCurrentWeekData();
+            if (!weekData.attendance[memberId]) weekData.attendance[memberId] = { days: {}, notes: '' };
+            weekData.attendance[memberId].days[day] = status;
+            saveData();
+            renderTable();
+        }
+
+        function handleAddMember(e) {
+            e.preventDefault();
+            const nameInput = document.getElementById('new-name');
+            const roleInput = document.getElementById('new-role');
+            
+            const newMember = {
+                id: Date.now().toString(),
+                name: nameInput.value.trim(),
+                role: roleInput.value.trim()
+            };
+
+            const weekData = getCurrentWeekData();
+            weekData.members.push(newMember);
+            saveData();
+            renderTable();
+
+            nameInput.value = '';
+            roleInput.value = '';
+            showToast('Anggota berhasil ditambahkan ke minggu ini');
+        }
+
+        function openEditModal(id) {
+            const weekData = getCurrentWeekData();
+            const member = weekData.members.find(m => m.id === id);
+            if (member) {
+                document.getElementById('edit-id').value = member.id;
+                document.getElementById('edit-name').value = member.name;
+                document.getElementById('edit-role').value = member.role || '';
+                document.getElementById('edit-modal').classList.remove('hidden');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+        }
+
+        function handleSaveEdit(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const name = document.getElementById('edit-name').value.trim();
+            const role = document.getElementById('edit-role').value.trim();
+
+            const weekData = getCurrentWeekData();
+            const member = weekData.members.find(m => m.id === id);
+            if (member) {
+                member.name = name;
+                member.role = role;
+                saveData();
+                renderTable();
+                closeEditModal();
+                showToast('Data anggota berhasil diperbarui');
+            }
+        }
+
+        function updateNotes(id, value) {
+            const weekData = getCurrentWeekData();
+            if (!weekData.attendance[id]) weekData.attendance[id] = { days: {}, notes: '' };
+            weekData.attendance[id].notes = value;
+            saveData();
+            renderDateButtons();
+        }
+
+        function deleteMember(id) {
+            const weekData = getCurrentWeekData();
+            const member = weekData.members.find(m => m.id === id);
+            if (member && confirm(`Apakah Anda yakin ingin menghapus "${member.name}" dari minggu ini?`)) {
+                weekData.members = weekData.members.filter(m => m.id !== id);
+                saveData();
+                renderTable();
+                showToast('Anggota berhasil dihapus dari minggu ini');
+            }
+        }
+
+        function resetAllStatus() {
+            if (confirm('Apakah Anda yakin ingin mereset seluruh status kehadiran minggu ini menjadi Hadir (H)?')) {
+                const weekData = getCurrentWeekData();
+                weekData.members.forEach(member => {
+                    if (!weekData.attendance[member.id]) weekData.attendance[member.id] = { days: {}, notes: '' };
+                    days.forEach(day => {
+                        weekData.attendance[member.id].days[day] = 'H';
+                    });
+                    weekData.attendance[member.id].notes = '';
+                });
+                saveData();
+                renderTable();
+                showToast('Absensi minggu ini telah direset');
+            }
+        }
+
+        function updateStats() {
+            let countH = 0, countI = 0, countS = 0, countA = 0, countL = 0;
+            const weekData = getCurrentWeekData();
+            const members = weekData.members;
+            const attendance = weekData.attendance;
+
+            members.forEach(m => {
+                const memberWeek = attendance[m.id] || { days: {} };
+                days.forEach(d => {
+                    const st = memberWeek.days[d] || 'H';
+                    if (st === 'H') countH++;
+                    else if (st === 'I') countI++;
+                    else if (st === 'S') countS++;
+                    else if (st === 'A') countA++;
+                    else if (st === 'L') countL++;
+                });
+            });
+
+            document.getElementById('stat-h').textContent = countH;
+            document.getElementById('stat-i').textContent = countI;
+            document.getElementById('stat-s').textContent = countS;
+            document.getElementById('stat-a').textContent = countA;
+            document.getElementById('stat-l').textContent = countL;
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allWeeklyData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `semua_data_absensi_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('Seluruh data berhasil diekspor');
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported && typeof imported === 'object') {
+                        allWeeklyData = imported;
+                        saveData();
+                        renderTable();
+                        renderDateButtons();
+                        showToast('Data berhasil dipulihkan / di-restore!');
+                    } else {
+                        alert('Format file JSON tidak valid.');
+                    }
+                } catch (err) {
+                    alert('Gagal membaca file JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function printSimpleReport() {
+            const weekDates = getWeekDates(getMondayKey(currentMondayDate));
+            const periodStr = `${weekDates[0].dateStr} s/d ${weekDates[4].dateStr}`;
+            const weekData = getCurrentWeekData();
+            const members = weekData.members;
+            const attendance = weekData.attendance;
+
+            let daysTableRowsHtml = '';
+
+            days.forEach((dayKey, idx) => {
+                const dateObj = new Date(currentMondayDate);
+                dateObj.setDate(currentMondayDate.getDate() + idx);
+                const dayName = dayLabels[dayKey];
+                const dateStr = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+
+                const hadir = members.filter(m => {
+                    const mw = attendance[m.id] || { days: {} };
+                    return (mw.days[dayKey] || 'H') === 'H';
+                });
+
+                const tidakHadir = members.filter(m => {
+                    const mw = attendance[m.id] || { days: {} };
+                    return ['I','S','A','L'].includes(mw.days[dayKey]);
+                });
+
+                const hadirNames = hadir.map(m => m.name).join(', ') || '-';
+                
+                let tidakHadirHtml = '<span style="color:#666; font-style:italic;">Semua Hadir (Nihil)</span>';
+                if (tidakHadir.length > 0) {
+                    tidakHadirHtml = tidakHadir.map(m => {
+                        const mw = attendance[m.id];
+                        const stLabel = mw.days[dayKey] === 'I' ? 'IZIN' : (mw.days[dayKey] === 'S' ? 'SAKIT' : (mw.days[dayKey] === 'A' ? 'ALPA' : 'LIBUR/CUTI'));
+                        return `<div><strong>• ${m.name}</strong> [${stLabel}] ${mw.notes ? `<em>(${mw.notes})</em>` : ''}</div>`;
+                    }).join('');
+                }
+
+                daysTableRowsHtml += `
+                    <tr>
+                        <td style="padding: 6px 8px; font-weight: bold; width: 120px; vertical-align: top; border-bottom: 1px solid #ddd;">
+                            ${dayName}, ${dateStr}
+                        </td>
+                        <td style="padding: 6px 8px; vertical-align: top; border-bottom: 1px solid #ddd; line-height: 1.3;">
+                            ${tidakHadirHtml}
+                        </td>
+                        <td style="padding: 6px 8px; vertical-align: top; border-bottom: 1px solid #ddd; line-height: 1.3; font-size: 11px; color: #333;">
+                            ${hadirNames}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            const printWindow = window.open('', '_blank', 'width=900,height=700');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Rekap Absensi Ringkas - ${periodStr}</title>
+                    <style>
+                        @page { size: A4 portrait; margin: 12mm; }
+                        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 0; padding: 0; }
+                        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px; }
+                        .header h2 { margin: 0; font-size: 16px; text-transform: uppercase; }
+                        .header p { margin: 2px 0 0 0; font-size: 11px; color: #444; }
+                        table { width: 100%; border-collapse: collapse; }
+                        th { background-color: #f2f2f2; padding: 6px 8px; text-align: left; font-size: 11px; border-bottom: 2px solid #000; border-top: 1px solid #000; }
+                        .footer { margin-top: 15px; text-align: right; font-size: 10px; color: #666; border-top: 1px solid #eee; padding-top: 5px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h2>REKAPITULASI ABSENSI MINGGUAN</h2>
+                        <p>Periode: <strong>${periodStr}</strong> | Total Anggota: ${members.length} Orang</p>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Hari & Tanggal</th>
+                                <th style="width: 40%;">Tidak Hadir / Libur & Alasan</th>
+                                <th style="width: 42%;">Anggota Hadir</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${daysTableRowsHtml}
+                        </tbody>
+                    </table>
+
+                    <div class="footer">
+                        Dicetak Otomatis pada: ${new Date().toLocaleString('id-ID')}
+                    </div>
+
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                            window.onafterprint = function() { window.close(); };
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+
+        function getWeekDates(mondayStr) {
+            const result = [];
+            const curr = new Date(mondayStr);
+            for (let i = 0; i < 5; i++) {
+                const d = new Date(curr);
+                d.setDate(curr.getDate() + i);
+                result.push({
+                    dayKey: days[i],
+                    dayName: dayLabels[days[i]],
+                    dateStr: d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }),
+                    fullDate: d
+                });
+            }
+            return result;
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/&lt;/g, "<")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
